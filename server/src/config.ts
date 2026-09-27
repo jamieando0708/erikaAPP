@@ -15,6 +15,10 @@ export interface Config {
   corsOrigins: string[];
   /** Fake AI results so the app can be tried without an API key. */
   demoMode: boolean;
+  /** Speech-to-text for videos without captions. Null disables it. */
+  deepgramApiKey: string | null;
+  /** Videos longer than this aren't transcribed (keeps cost and wait time down). */
+  maxTranscribeSeconds: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -44,7 +48,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
   return {
     port: Number(env.PORT ?? 4000),
-    databasePath: env.DATABASE_PATH ?? "./data/factfit.db",
+    databasePath: env.DATABASE_PATH ?? "./data/sift.db",
     healthDataKey,
     billingMode,
     revenueCatWebhookSecret: env.REVENUECAT_WEBHOOK_SECRET ?? null,
@@ -52,5 +56,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     claudeModel: env.CLAUDE_MODEL ?? "claude-opus-5",
     corsOrigins: (env.CORS_ORIGINS ?? (production ? "" : "*")).split(",").map((o) => o.trim()).filter(Boolean),
     demoMode: env.DEMO_MODE === "1" && !production,
+    deepgramApiKey: env.DEEPGRAM_API_KEY || null,
+    maxTranscribeSeconds: Number(env.MAX_TRANSCRIBE_SECONDS ?? 900),
   };
 }

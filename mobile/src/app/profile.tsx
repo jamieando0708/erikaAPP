@@ -1,10 +1,10 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Switch, Text, View } from "react-native";
-import { Body, Button, Card, Chips, ErrorText, Field, Heading, ListEditor, Loading, Screen } from "../components/ui";
+import { Body, Button, Card, Chips, ErrorText, Eyebrow, Field, ListEditor, Loading, Screen } from "../components/ui";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { colors, font, space } from "../lib/theme";
+import { colors, fonts, size, space } from "../lib/theme";
 import type { HealthProfile } from "../lib/types";
 
 const EMPTY: HealthProfile = {
@@ -51,7 +51,7 @@ export default function ProfileScreen() {
       .catch((e) => setError((e as Error).message));
   }, [id]);
 
-  if (!profile) return error ? <ErrorText message={error} /> : <Loading />;
+  if (!profile) return error ? <Screen><ErrorText message={error} /></Screen> : <Loading />;
 
   const set = <K extends keyof HealthProfile>(key: K, value: HealthProfile[K]) =>
     setProfile((p) => (p ? { ...p, [key]: value } : p));
@@ -77,7 +77,7 @@ export default function ProfileScreen() {
       <Body muted>Everything is optional. Fill in what you're comfortable with - more detail means better advice.</Body>
 
       <Card>
-        <Heading>About you</Heading>
+        <Eyebrow color={colors.primary}>About you</Eyebrow>
         <Field label="Profile name" hint="e.g. Me, Mum, Sam" value={profile.displayName} onChangeText={(v) => set("displayName", v)} />
         <Field
           label="Age"
@@ -99,7 +99,12 @@ export default function ProfileScreen() {
         {profile.sex === "female" || profile.sex === "intersex" ? (
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <Body>Pregnant or breastfeeding</Body>
-            <Switch value={profile.pregnant} onValueChange={(v) => set("pregnant", v)} />
+            <Switch
+              value={profile.pregnant}
+              onValueChange={(v) => set("pregnant", v)}
+              trackColor={{ true: colors.primary, false: colors.border }}
+              thumbColor={colors.text}
+            />
           </View>
         ) : null}
         <View style={{ flexDirection: "row", gap: space.md }}>
@@ -123,7 +128,7 @@ export default function ProfileScreen() {
       </Card>
 
       <Card>
-        <Heading>Your health</Heading>
+        <Eyebrow color={colors.primary}>Your health</Eyebrow>
         <ListEditor
           label="Health conditions"
           items={profile.conditions}
@@ -151,7 +156,7 @@ export default function ProfileScreen() {
       </Card>
 
       <Card>
-        <Heading>Fitness</Heading>
+        <Eyebrow color={colors.primary}>Fitness</Eyebrow>
         <Text style={labelStyle}>Fitness level</Text>
         <Chips
           value={profile.fitnessLevel}
@@ -183,4 +188,4 @@ export default function ProfileScreen() {
   );
 }
 
-const labelStyle = { fontSize: font.body, fontWeight: "600" as const, color: colors.text };
+const labelStyle = { fontSize: size.body, fontFamily: fonts.bodyMedium, color: colors.text };

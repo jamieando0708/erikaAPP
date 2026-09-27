@@ -1,18 +1,21 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
 import { Pressable, Share, StyleSheet, Text, View } from "react-native";
-import { Body, Button, Card, ErrorText, Heading, Loading, Screen } from "../../components/ui";
+import { PulseMark } from "../../components/Logo";
+import { Body, Button, Card, ErrorText, Eyebrow, Pill, Screen, ScoreRing, Title } from "../../components/ui";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { claimStyle, colors, font, relevanceStyle, space, verdictStyle } from "../../lib/theme";
+import { claimStyle, colors, fonts, PLATFORM_NAMES, relevanceStyle, size, space, verdictStyle } from "../../lib/theme";
 import type { Check } from "../../lib/types";
 
 const WAITING_MESSAGES = [
-  "Watching the video…",
+  "Listening to the video…",
   "Finding the claims…",
   "Checking the science…",
   "Reading trusted health sources…",
+  "Weighing up the evidence…",
   "Writing up your results…",
 ];
 
@@ -23,6 +26,7 @@ export default function CheckScreen() {
   const [check, setCheck] = useState<Check | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [showSources, setShowSources] = useState(false);
 
   useEffect(() => {
     let stopped = false;
@@ -39,7 +43,7 @@ export default function CheckScreen() {
       }
     };
     void poll();
-    const ticker = setInterval(() => setTick((t) => t + 1), 4000);
+    const ticker = setInterval(() => setTick((t) => t + 1), 3500);
     return () => {
       stopped = true;
       clearTimeout(timer);
@@ -49,15 +53,27 @@ export default function CheckScreen() {
 
   const goHome = () => (router.canGoBack() ? router.back() : router.replace("/"));
 
-  if (error) return <Screen><ErrorText message={error} /></Screen>;
+  if (error) {
+    return (
+      <Screen>
+        <ErrorText message={error} />
+      </Screen>
+    );
+  }
   if (!check || check.status === "processing") {
-    return <Loading label={`${WAITING_MESSAGES[tick % WAITING_MESSAGES.length]}\nThis usually takes under a minute.`} />;
+    return (
+      <View style={styles.waiting}>
+        <PulseMark size={56} />
+        <Text style={styles.waitingText}>{WAITING_MESSAGES[tick % WAITING_MESSAGES.length]}</Text>
+        <Body muted style={{ textAlign: "center" }}>This usually takes under a minute.</Body>
+      </View>
+    );
   }
   if (check.status === "failed" || !check.report) {
     return (
       <Screen>
-        <ErrorText message={check.error ?? "We couldn't check this video."} />
-        <Button title="Try another video" onPress={goHome} />
+        <ErrorText message={check.error ?? "We couldn't check this one."} />
+        <Button title="Try something else" onPress={goHome} />
       </Screen>
     );
   }
@@ -65,11 +81,11 @@ export default function CheckScreen() {
   const r = check.report;
   const v = verdictStyle[r.verdict] ?? verdictStyle.unverifiable!;
   const open = (url: string) => void WebBrowser.openBrowserAsync(url);
+  const isLink = check.platform !== "text";
 
   const shareWithDoctor = async () => {
     try {
-      const text = await api.doctorReport(check.id);
-      await Share.share({ message: text });
+      await Share.share({ message: await api.doctorReport(check.id) });
     } catch (e) {
       setError((e as Error).message);
     }
@@ -78,68 +94,92 @@ export default function CheckScreen() {
   return (
     <Screen>
       {r.urgent_safety_warning ? (
-        <Card style={{ backgroundColor: colors.dangerBg, borderColor: "#FCA5A5" }}>
-          <Heading>⛔ Safety warning</Heading>
+        <Card style={{ backgroundColor: colors.dangerBg, borderColor: colors.danger + "66" }}>
+          <View style={styles.inline}>
+            <Ionicons name="warning" size={22} color={colors.danger} />
+            <Text style={[styles.cardTitle, { color: colors.danger }]}>Safety warning</Text>
+          </View>
           <Body>{r.urgent_safety_warning}</Body>
         </Card>
       ) : null}
 
-      <Card style={{ backgroundColor: v.bg, borderColor: v.bg, alignItems: "center" }}>
-        <Text style={{ fontSize: 48 }}>{v.emoji}</Text>
-        <Text style={[styles.score, { color: v.color }]}>{r.overall_score}/100</Text>
-        <Text style={[styles.verdict, { color: v.color }]}>{v.label}</Text>
-        <Body style={{ textAlign: "center" }}>{r.summary}</Body>
-      </Card>
+      <Eyebrow>{PLATFORM_NAMES[check.platform] ?? "Link"}</Eyebrow>
+      <Title>{r.headline ?? r.summary}</Title>
+      <View style={[styles.inline, { gap: space.md }]}>
+        <ScoreRing score={r.overall_score} color={v.color} size={76} stroke={6} />
+        <View style={{ flex: 1, gap: space.sm }}>
+          <Pill label={v.label} color={v.color} bg={v.bg} icon={v.icon as never} />
+          <Text style={styles.scoreCaption}>Evidence score out of 100</Text>
+        </View>
+      </View>
+      {r.headline ? <Body>{r.summary}</Body> : null}
 
       {r.personal ? (
-        <Card>
-          <Heading>What this means for you</Heading>
-          <Text
-            style={[
-              styles.pill,
-              { color: relevanceStyle[r.personal.relevance]?.color, backgroundColor: relevanceStyle[r.personal.relevance]?.bg },
-            ]}
-          >
-            {relevanceStyle[r.personal.relevance]?.label}
-          </Text>
+        <Card style={{ borderColor: (relevanceStyle[r.personal.relevance]?.color ?? colors.primary) + "55" }}>
+          <Eyebrow color={colors.primary}>For you</Eyebrow>
+          <Pill
+            label={relevanceStyle[r.personal.relevance]?.label ?? ""}
+            color={relevanceStyle[r.personal.relevance]?.color ?? colors.muted}
+            bg={relevanceStyle[r.personal.relevance]?.bg ?? colors.surfaceRaised}
+            icon={relevanceStyle[r.personal.relevance]?.icon as never}
+          />
           <Body>{r.personal.advice}</Body>
-          {r.personal.cautions.map((c, i) => (
-            <Body key={i}>⚠️ {c}</Body>
+          {r.personal.cautions.map((c) => (
+            <View key={c} style={styles.point}>
+              <Ionicons name="warning-outline" size={18} color={colors.warn} style={styles.pointIcon} />
+              <Body style={styles.pointText}>{c}</Body>
+            </View>
           ))}
         </Card>
       ) : !user?.tier.personalAdvice ? (
         <Pressable onPress={() => router.push("/plans")}>
-          <Card style={{ backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }}>
-            <Body>🔒 Want to know if this advice is right for <Text style={{ fontWeight: "800" }}>you</Text>? Upgrade to Plus.</Body>
+          <Card style={[styles.inline, { borderColor: colors.primary + "44" }]}>
+            <Ionicons name="lock-closed-outline" size={20} color={colors.primary} />
+            <Body style={{ flex: 1, fontSize: size.small, lineHeight: 21 }}>
+              See what this means for <Text style={{ fontFamily: fonts.bodySemi }}>you</Text>, based on your health
+              context. Available on Plus.
+            </Body>
           </Card>
         </Pressable>
       ) : null}
 
       {r.see_a_professional ? (
-        <Card style={{ backgroundColor: colors.warnBg, borderColor: "#FDE68A" }}>
-          <Body>👩‍⚕️ Check with a doctor, pharmacist or other health professional before trying this.</Body>
-        </Card>
-      ) : null}
-
-      {r.useful_takeaways.length ? (
-        <Card>
-          <Heading>Worth keeping</Heading>
-          {r.useful_takeaways.map((t, i) => (
-            <Body key={i}>✔️ {t}</Body>
-          ))}
+        <Card style={[styles.inline, { backgroundColor: colors.warnBg, borderColor: colors.warn + "44" }]}>
+          <Ionicons name="medkit-outline" size={20} color={colors.warn} />
+          <Body style={{ flex: 1, fontSize: size.small, lineHeight: 21 }}>
+            Check with a doctor, pharmacist or other health professional before trying this.
+          </Body>
         </Card>
       ) : null}
 
       {r.claims.length ? (
         <Card>
-          <Heading>What the video claims</Heading>
-          {r.claims.map((c, i) => (
-            <View key={i} style={styles.claim}>
-              <Body style={{ fontWeight: "700" }}>"{c.claim}"</Body>
-              <Text style={[styles.claimVerdict, { color: claimStyle[c.verdict]?.color }]}>
-                {claimStyle[c.verdict]?.label}
-              </Text>
-              <Body>{c.explanation}</Body>
+          <Text style={styles.cardTitle}>Key points</Text>
+          {r.claims.map((c) => {
+            const cs = claimStyle[c.verdict] ?? claimStyle.unverifiable!;
+            return (
+              <View key={c.claim} style={styles.claim}>
+                <View style={styles.point}>
+                  <Ionicons name={cs.icon as never} size={20} color={cs.color} style={styles.pointIcon} />
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={styles.claimText}>{c.claim}</Text>
+                    <Text style={[styles.claimVerdict, { color: cs.color }]}>{cs.label}</Text>
+                    <Body muted style={{ fontSize: 15, lineHeight: 22 }}>{c.explanation}</Body>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </Card>
+      ) : null}
+
+      {r.useful_takeaways.length ? (
+        <Card>
+          <Text style={styles.cardTitle}>Worth keeping</Text>
+          {r.useful_takeaways.map((t) => (
+            <View key={t} style={styles.point}>
+              <Ionicons name="checkmark" size={20} color={colors.primary} style={styles.pointIcon} />
+              <Body style={styles.pointText}>{t}</Body>
             </View>
           ))}
         </Card>
@@ -147,49 +187,57 @@ export default function CheckScreen() {
 
       {r.red_flags.length ? (
         <Card>
-          <Heading>Red flags</Heading>
-          {r.red_flags.map((f, i) => (
-            <Body key={i}>🚩 {f}</Body>
+          <Text style={styles.cardTitle}>Red flags</Text>
+          {r.red_flags.map((f) => (
+            <View key={f} style={styles.point}>
+              <Ionicons name="flag-outline" size={18} color={colors.danger} style={styles.pointIcon} />
+              <Body style={styles.pointText}>{f}</Body>
+            </View>
           ))}
         </Card>
       ) : null}
 
       {r.sources.length ? (
         <Card>
-          <Heading>Sources</Heading>
-          {r.sources.map((s) => (
-            <Pressable key={s.url} onPress={() => open(s.url)}>
-              <Text style={styles.source}>{s.title}</Text>
-            </Pressable>
-          ))}
+          <Pressable style={[styles.inline, { justifyContent: "space-between" }]} onPress={() => setShowSources((s) => !s)}>
+            <Text style={styles.cardTitle}>Sources ({r.sources.length})</Text>
+            <Ionicons name={showSources ? "chevron-up" : "chevron-down"} size={20} color={colors.muted} />
+          </Pressable>
+          {showSources
+            ? r.sources.map((s) => (
+                <Pressable key={s.url} onPress={() => open(s.url)} style={styles.point}>
+                  <Ionicons name="open-outline" size={16} color={colors.primary} style={styles.pointIcon} />
+                  <Text style={styles.source}>{s.title}</Text>
+                </Pressable>
+              ))
+            : null}
         </Card>
       ) : null}
 
       <View style={{ gap: space.sm }}>
-        {user?.tier.doctorReports ? <Button title="Share with my doctor" variant="secondary" onPress={shareWithDoctor} /> : null}
-        <Button title="Open the video" variant="secondary" onPress={() => open(check.url)} />
-        <Button title="Check another video" onPress={goHome} />
+        {user?.tier.doctorReports ? (
+          <Button title="Share with my doctor" icon="share-outline" variant="secondary" onPress={shareWithDoctor} />
+        ) : null}
+        {isLink ? <Button title="Open original" icon="open-outline" variant="secondary" onPress={() => open(check.url)} /> : null}
+        <Button title="Check something else" onPress={goHome} />
       </View>
-      <Body muted style={{ fontSize: font.small, textAlign: "center" }}>
-        Checked by AI using published research. This is general information, not medical advice.
-      </Body>
+      <Text style={styles.disclaimer}>Checked by AI against published evidence. General information, not medical advice.</Text>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  score: { fontSize: 44, fontWeight: "900" },
-  verdict: { fontSize: font.heading, fontWeight: "800" },
-  pill: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    overflow: "hidden",
-    fontWeight: "700",
-    fontSize: font.small,
-  },
-  claim: { gap: space.xs, paddingVertical: space.sm, borderTopWidth: 1, borderTopColor: colors.border },
-  claimVerdict: { fontWeight: "800", fontSize: font.body },
-  source: { color: colors.primary, fontSize: font.body, textDecorationLine: "underline", paddingVertical: 4 },
+  waiting: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, padding: space.lg, backgroundColor: colors.bg },
+  waitingText: { fontFamily: fonts.heading, fontSize: size.heading, color: colors.text, textAlign: "center" },
+  inline: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  scoreCaption: { fontFamily: fonts.body, fontSize: size.small, color: colors.muted },
+  cardTitle: { fontFamily: fonts.heading, fontSize: 18, color: colors.text },
+  point: { flexDirection: "row", gap: space.sm, alignItems: "flex-start" },
+  pointIcon: { marginTop: 3 },
+  pointText: { flex: 1, fontSize: 16, lineHeight: 23 },
+  claim: { paddingTop: space.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  claimText: { fontFamily: fonts.bodySemi, fontSize: 16, lineHeight: 22, color: colors.text },
+  claimVerdict: { fontFamily: fonts.bodySemi, fontSize: size.small },
+  source: { flex: 1, color: colors.primary, fontFamily: fonts.body, fontSize: 15, lineHeight: 22 },
+  disclaimer: { fontFamily: fonts.body, fontSize: 13, color: colors.faint, textAlign: "center", marginTop: space.sm },
 });

@@ -1,6 +1,10 @@
 import { execFile } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import type { Platform } from "./platform.js";
+import { mimeForFile, type Transcriber } from "./transcribe.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -9,9 +13,9 @@ export interface VideoContent {
   description: string | null;
   creator: string | null;
   durationSec: number | null;
-  /** What was said in the video, from captions. Null when none were available. */
+  /** What was said in the video, from captions or speech-to-text. Null when unavailable. */
   transcript: string | null;
-  source: "captions" | "metadata" | "none";
+  source: "captions" | "speech" | "metadata" | "none";
 }
 
 export interface VideoExtractor {
@@ -35,12 +39,19 @@ interface YtDlpInfo {
 }
 
 /**
- * Reads a video's caption, title and spoken captions without downloading the video.
- * Uses yt-dlp (supports TikTok, Instagram, YouTube, Facebook, X and many more),
- * falling back to public oEmbed endpoints when yt-dlp is unavailable or blocked.
+ * Reads a video's caption, title and what's said in it, using yt-dlp (supports
+ * TikTok, Instagram, YouTube, Facebook, X and many more).
+ *
+ * What was said comes from the video's captions when it has them. Otherwise, if a
+ * transcriber is configured, the audio is downloaded to a temp folder, turned into
+ * text, and deleted. Falls back to public oEmbed endpoints if yt-dlp fails.
  */
 export class YtDlpExtractor implements VideoExtractor {
-  constructor(private readonly ytDlpPath: string) {}
+  constructor(
+    private readonly ytDlpPath: string,
+    private readonly transcriber: Transcriber | null = null,
+    private readonly maxTranscribeSeconds = 15 * 60,
+  ) {}
 
   async extract(url: URL, platform: Platform): Promise<VideoContent> {
     try {
@@ -50,18 +61,57 @@ export class YtDlpExtractor implements VideoExtractor {
         { timeout: 45_000, maxBuffer: 50 * 1024 * 1024 },
       );
       const info = JSON.parse(stdout) as YtDlpInfo;
-      const transcript = await fetchCaptions(info);
-      return {
+      const base = {
         title: info.title ?? null,
         description: info.description ?? null,
         creator: info.uploader ?? info.channel ?? null,
         durationSec: info.duration ?? null,
-        transcript,
-        source: transcript ? "captions" : "metadata",
       };
+      const captions = await fetchCaptions(info);
+      if (captions) return { ...base, transcript: captions, source: "captions" };
+
+      const tooLong = info.duration !== undefined && info.duration > this.maxTranscribeSeconds;
+      if (this.transcriber && !tooLong) {
+        const speech = await this.transcribeAudio(url).catch((err: Error) => {
+          console.warn(`speech-to-text failed for ${platform}: ${err.message.split("\n")[0]}`);
+          return null;
+        });
+        if (speech) return { ...base, transcript: speech.slice(0, MAX_TRANSCRIPT_CHARS), source: "speech" };
+      }
+      return { ...base, transcript: null, source: "metadata" };
     } catch (err) {
       console.warn(`yt-dlp failed for ${platform}: ${(err as Error).message.split("\n")[0]}`);
       return oEmbedFallback(url, platform);
+    }
+  }
+
+  private async transcribeAudio(url: URL): Promise<string | null> {
+    const dir = await mkdtemp(join(tmpdir(), "sift-audio-"));
+    try {
+      const { stdout } = await execFileAsync(
+        this.ytDlpPath,
+        [
+          // Smallest useful download: audio only when the site offers it, else the whole video.
+          "-f",
+          "bestaudio[filesize<60M]/bestaudio/best[filesize<150M]/best",
+          "--max-filesize",
+          "150M",
+          "--no-playlist",
+          "--no-warnings",
+          "-o",
+          join(dir, "media.%(ext)s"),
+          "--print",
+          "after_move:filepath",
+          "--no-simulate",
+          url.toString(),
+        ],
+        { timeout: 120_000, maxBuffer: 1024 * 1024 },
+      );
+      const file = stdout.trim().split("\n").pop();
+      if (!file) return null;
+      return await this.transcriber!.transcribe(file, mimeForFile(file));
+    } finally {
+      await rm(dir, { recursive: true, force: true });
     }
   }
 }

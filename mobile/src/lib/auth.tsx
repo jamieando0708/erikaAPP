@@ -3,7 +3,7 @@ import { api, ApiError, setAuthToken } from "./api";
 import { getItem, setItem } from "./storage";
 import type { Me } from "./types";
 
-const TOKEN_KEY = "factfit.token";
+const TOKEN_KEY = "sift.token";
 
 interface AuthState {
   ready: boolean;

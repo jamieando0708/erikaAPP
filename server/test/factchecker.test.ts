@@ -4,6 +4,7 @@ import { ClaudeFactChecker, FactCheckError, type FactCheckInput } from "../src/f
 import type { ModelReport } from "../src/factcheck/report.js";
 
 const report: ModelReport = {
+  headline: "Apple cider vinegar for fat loss?",
   topic: "nutrition",
   overall_score: 35,
   verdict: "misleading",
@@ -128,6 +129,24 @@ describe("ClaudeFactChecker", () => {
     expect(out.sources).toHaveLength(1);
     const lastMessages = calls[2]!.messages as Array<{ role: string }>;
     expect(lastMessages.at(-1)!.role).toBe("user");
+  });
+
+  it("builds a claim prompt for pasted text and labels speech-to-text transcripts", async () => {
+    const { client, calls } = fakeClient([
+      response([{ type: "tool_use", id: "t1", name: "submit_report", input: report }], "tool_use"),
+      response([{ type: "tool_use", id: "t2", name: "submit_report", input: report }], "tool_use"),
+    ]);
+    const checker = new ClaudeFactChecker(client, "m");
+    await checker.check({ ...input, url: null, video: null, platform: "text", userNote: "Cold showers cure depression" });
+    const textPrompt = (calls[0]!.messages as Array<{ content: string }>)[0]!.content;
+    expect(textPrompt).toContain("<post>\nCold showers cure depression\n</post>");
+    expect(textPrompt).not.toContain("<video>");
+
+    await checker.check({ ...input, video: { ...input.video!, source: "speech" } });
+    const videoPrompt = (calls[1]!.messages as Array<{ content: string }>)[0]!.content;
+    expect(videoPrompt).toContain("speech-to-text");
+    const toolTypes = (calls[1]!.tools as Array<{ type?: string }>).map((t) => t.type);
+    expect(toolTypes).toContain("web_fetch_20260209");
   });
 
   it("raises a friendly error on refusal", async () => {

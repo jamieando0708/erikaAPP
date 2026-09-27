@@ -1,5 +1,5 @@
 {
-  "name": "factfit-server",
+  "name": "sift-server",
   "version": "1.0.0",
   "scripts": {
     "test": "vitest run",

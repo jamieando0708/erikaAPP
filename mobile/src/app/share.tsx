@@ -2,6 +2,7 @@ import { Redirect, useRouter } from "expo-router";
 import { useShareIntentContext } from "expo-share-intent";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
+import { PulseMark } from "../components/Logo";
 import { Body, Button, ErrorText, Loading, Screen, Title } from "../components/ui";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -40,12 +41,11 @@ export default function ShareScreen() {
   if (error) {
     return (
       <Screen>
+        <PulseMark size={36} />
         <Title>Couldn't check that</Title>
         <ErrorText message={error.message} />
         <View style={{ gap: space.sm }}>
-          {error.code === "limit_reached" ? (
-            <Button title="See plans" onPress={() => router.replace("/plans")} />
-          ) : null}
+          {error.code === "limit_reached" ? <Button title="See plans" onPress={() => router.replace("/plans")} /> : null}
           <Button title="Go home" variant="secondary" onPress={() => router.replace("/")} />
         </View>
       </Screen>
@@ -55,11 +55,11 @@ export default function ShareScreen() {
   if (isReady && !hasShareIntent && !started.current) {
     return (
       <Screen>
-        <Body>Nothing was shared. Go back to your video and tap Share → FactFit.</Body>
+        <Body>Nothing was shared. Go back to your video and tap Share → Sift.</Body>
         <Button title="Go home" onPress={() => router.replace("/")} />
       </Screen>
     );
   }
 
-  return <Loading label="Getting your video ready…" />;
+  return <Loading label="Getting it ready…" />;
 }

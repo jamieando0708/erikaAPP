@@ -8,7 +8,9 @@ export type Platform =
   | "threads"
   | "pinterest"
   | "reddit"
-  | "other";
+  | "other"
+  /** Pasted text rather than a link. */
+  | "text";
 
 const HOSTS: Array<[RegExp, Platform]> = [
   [/(^|\.)tiktok\.com$/, "tiktok"],

@@ -1,18 +1,19 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
-import { Body, Button, Card, ErrorText, Heading, Loading, Screen, Title } from "../components/ui";
+import { Body, Button, Card, ErrorText, Eyebrow, Loading, Screen, Title } from "../components/ui";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { realBillingEnabled, restorePurchases, subscribe } from "../lib/billing";
-import { colors, font, space } from "../lib/theme";
+import { colors, fonts, size, space } from "../lib/theme";
 import type { Tier } from "../lib/types";
 
 function features(t: Tier): string[] {
   return [
-    t.unlimited ? "Unlimited video checks" : `${t.checksPerMonth} video checks a month`,
-    "Score, true/false claims and sources",
-    ...(t.personalAdvice ? ["Advice that fits your own health profile"] : []),
+    t.unlimited ? "Unlimited checks" : `${t.checksPerMonth} checks a month`,
+    "Score, key points and sources",
+    ...(t.personalAdvice ? ["What it means for you, based on your health context"] : []),
     ...(t.maxProfiles > 1 ? [`Family: up to ${t.maxProfiles} people`] : []),
     ...(t.doctorReports ? ["Reports to share with your doctor"] : []),
   ];
@@ -49,11 +50,14 @@ export default function Plans() {
 
   return (
     <Screen>
-      <Title>Pick your plan</Title>
-      <Body muted>Monthly. Cancel any time.</Body>
+      <View style={{ gap: space.sm }}>
+        <Eyebrow color={colors.primary}>Less scrolling. More knowing.</Eyebrow>
+        <Title>Pick your plan</Title>
+        <Body muted>Monthly. Cancel any time.</Body>
+      </View>
       {!realBillingEnabled ? (
-        <Card style={{ backgroundColor: colors.warnBg, borderColor: "#FDE68A" }}>
-          <Body style={{ fontSize: font.small }}>Test mode: choosing a plan unlocks it for free. No payment is taken.</Body>
+        <Card style={{ backgroundColor: colors.warnBg, borderColor: colors.warn + "44" }}>
+          <Body style={{ fontSize: size.small }}>Test mode: choosing a plan unlocks it for free. No payment is taken.</Body>
         </Card>
       ) : null}
       <ErrorText message={error} />
@@ -61,18 +65,21 @@ export default function Plans() {
         const current = user.tier.id === t.id;
         const popular = t.id === "plus";
         return (
-          <Card key={t.id} style={popular ? { borderColor: colors.primary, borderWidth: 2 } : undefined}>
-            {popular ? <Text style={{ color: colors.primary, fontWeight: "800" }}>MOST POPULAR</Text> : null}
+          <Card key={t.id} style={popular ? { borderColor: colors.primary, borderWidth: 1.5 } : undefined}>
+            {popular ? <Eyebrow color={colors.primary}>Most popular</Eyebrow> : null}
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
-              <Heading>{t.name}</Heading>
-              <Text style={{ fontSize: font.heading, fontWeight: "800", color: colors.text }}>
+              <Text style={{ fontFamily: fonts.heading, fontSize: 22, color: colors.text }}>{t.name}</Text>
+              <Text style={{ fontFamily: fonts.headingBold, fontSize: 26, color: colors.text }}>
                 ${t.priceUsdMonthly}
-                <Text style={{ fontSize: font.small, color: colors.muted }}>/month</Text>
+                <Text style={{ fontFamily: fonts.body, fontSize: size.small, color: colors.muted }}>/month</Text>
               </Text>
             </View>
-            <View style={{ gap: space.xs }}>
+            <View style={{ gap: 6, paddingVertical: space.xs }}>
               {features(t).map((f) => (
-                <Body key={f}>✓ {f}</Body>
+                <View key={f} style={{ flexDirection: "row", gap: space.sm }}>
+                  <Ionicons name="checkmark" size={18} color={colors.primary} style={{ marginTop: 3 }} />
+                  <Body style={{ flex: 1, fontSize: 16, lineHeight: 23 }}>{f}</Body>
+                </View>
               ))}
             </View>
             <Button
@@ -86,12 +93,12 @@ export default function Plans() {
         );
       })}
       {realBillingEnabled ? (
-        <Button title="Restore purchases" variant="secondary" onPress={() => restorePurchases(user.id).then(refresh)} />
+        <Button title="Restore purchases" variant="ghost" onPress={() => restorePurchases(user.id).then(refresh)} />
       ) : null}
-      <Body muted style={{ fontSize: font.small }}>
-        "Unlimited" plans have a fair-use limit of {plans.find((p) => p.id === "plus")?.checksPerMonth} checks a month
-        (Plus) and {plans.find((p) => p.id === "pro")?.checksPerMonth} (Pro).
-      </Body>
+      <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.faint }}>
+        Unlimited plans have a fair-use limit of {plans.find((p) => p.id === "plus")?.checksPerMonth} checks a month (Plus)
+        and {plans.find((p) => p.id === "pro")?.checksPerMonth} (Pro).
+      </Text>
     </Screen>
   );
 }

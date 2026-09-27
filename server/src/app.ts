@@ -250,7 +250,7 @@ export function createApp({ config, db, extractor, factChecker }: AppDeps) {
       ...checkSummary(c),
       report: c.result_enc ? decryptJson<FactCheckReport>(key, c.result_enc) : null,
     }));
-    res.setHeader("Content-Disposition", 'attachment; filename="factfit-data.json"');
+    res.setHeader("Content-Disposition", 'attachment; filename="sift-data.json"');
     res.json({
       exportedAt: new Date().toISOString(),
       account: {
@@ -331,9 +331,13 @@ export function createApp({ config, db, extractor, factChecker }: AppDeps) {
   app.post("/checks", requireAuth, (req, res) => {
     const user = req.user!;
     const body = NewCheck.parse(req.body);
+    // A link to check, or else the pasted post/claim itself.
     const url = extractUrl(body.shared);
-    if (!url || !isPublicHost(url)) {
-      throw new HttpError(400, "That doesn't look like a video link. Try copying the link again.", "bad_link");
+    if (url && !isPublicHost(url)) {
+      throw new HttpError(400, "That link can't be checked. Try copying it again.", "bad_link");
+    }
+    if (!url && body.shared.length < 15) {
+      throw new HttpError(400, "Paste a link, or type out the claim you want checked.", "bad_input");
     }
 
     const tier = effectiveTier(user.tier, user.tier_expires_at);
@@ -361,25 +365,29 @@ export function createApp({ config, db, extractor, factChecker }: AppDeps) {
     }
 
     const id = randomUUID();
-    const platform = detectPlatform(url);
+    const platform = url ? detectPlatform(url) : "text";
     db.prepare(
       "INSERT INTO checks (id, user_id, profile_id, url, platform, status, created_at) VALUES (?, ?, ?, ?, ?, 'processing', ?)",
-    ).run(id, user.id, profileId, url.toString(), platform, Date.now());
+    ).run(id, user.id, profileId, url ? url.toString() : body.shared, platform, Date.now());
 
     const job = (async () => {
       try {
-        const video = await extractor.extract(url, platform);
-        const hasContent = video.transcript || video.description || video.title || body.note;
-        if (!hasContent) {
-          throw new FactCheckError(
-            "We couldn't read this video. Add a short note about what it claims and try again.",
-          );
+        let video = null;
+        if (url) {
+          video = await extractor.extract(url, platform);
+          // Articles and other web pages are read by the AI itself (web_fetch).
+          const hasContent = video.transcript || video.description || video.title || body.note || platform === "other";
+          if (!hasContent) {
+            throw new FactCheckError(
+              "We couldn't read this video. Add a short note about what it claims and try again.",
+            );
+          }
         }
         const report = await factChecker.check({
-          url: url.toString(),
+          url: url ? url.toString() : null,
           platform,
           video,
-          userNote: body.note ?? null,
+          userNote: url ? (body.note ?? null) : body.shared,
           profile,
         });
         db.prepare("UPDATE checks SET status = 'done', result_enc = ? WHERE id = ?").run(encryptJson(key, report), id);
@@ -505,11 +513,12 @@ const VERDICT_LABEL: Record<string, string> = {
 
 function doctorReport(row: CheckRow, r: FactCheckReport): string {
   const lines = [
-    "FactFit - video fact-check summary",
-    `Video: ${row.url}`,
+    "Sift - fact-check summary",
+    row.platform === "text" ? `Claim: ${row.url}` : `Link: ${row.url}`,
     `Checked: ${new Date(row.created_at).toISOString().slice(0, 10)}`,
     `Overall: ${VERDICT_LABEL[r.verdict]} (${r.overall_score}/100)`,
     "",
+    r.headline,
     r.summary,
     "",
     "Claims:",

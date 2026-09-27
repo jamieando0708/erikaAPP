@@ -1,6 +1,8 @@
-# FactFit
+# Sift
 
-Fact-check health and fitness videos from social media. See a video on TikTok, Instagram, YouTube, Facebook or X, tap **Share → FactFit**, and get:
+**Cut through the noise. Understand your health.**
+
+Fact-check health and fitness videos, posts and claims from social media. See a video on TikTok, Instagram, YouTube, Facebook or X, tap **Share → Sift** (or paste a link, post or claim), and get:
 
 - a simple **score out of 100** and a verdict (Accurate, Mostly accurate, Mixed, Misleading, False)
 - each **claim** checked against real evidence, with **sources**
@@ -8,7 +10,7 @@ Fact-check health and fitness videos from social media. See a video on TikTok, I
 - **red flags** (selling a product, miracle claims, etc.)
 - on Plus and Pro, **what it means for you**, based on your own health profile
 
-> FactFit gives general information, not medical advice. It always tells people to talk to a professional before changing medication or treatment.
+> Sift gives general information, not medical advice. It always tells people to talk to a professional before changing medication or treatment.
 
 ## What's in this repo
 
@@ -20,9 +22,13 @@ Fact-check health and fitness videos from social media. See a video on TikTok, I
 ### How a fact-check works
 
 1. The app sends the shared link to the server.
-2. The server reads the video's caption, title and spoken captions with [yt-dlp](https://github.com/yt-dlp/yt-dlp) (it doesn't download the video).
+2. The server reads the video's caption and title with [yt-dlp](https://github.com/yt-dlp/yt-dlp), and works out what's **said** in it: from the video's captions when it has them, otherwise with **speech-to-text** ([Deepgram](https://deepgram.com)). For speech-to-text only the audio is downloaded, and it's deleted straight after. Articles are read by the AI directly, and pasted posts or claims are checked as they are.
 3. Claude (Anthropic's AI) finds the claims, **searches the web** for strong evidence (health agencies, clinical guidelines, research) and writes a plain-English report.
 4. Any source the AI cites that didn't come from a real search result is thrown away, so sources can't be made up.
+
+## Brand
+
+The app follows the Sift brand book: Midnight `#0B0F12`, Teal `#00D1B2`, Sage `#7ED3C6`, Sand `#EDEBE6`, Slate `#A7B0B8`, with Plus Jakarta Sans for headlines and Inter for body text. Colours, fonts and verdict styles live in `mobile/src/lib/theme.ts`, and the pulse logo in `mobile/src/components/Logo.tsx`. App icons and the splash screen are in `mobile/assets/`.
 
 ## Plans
 
@@ -65,7 +71,7 @@ npx expo start --web     # opens in your browser
 
 The Share-menu feature only works in a real phone build (see below). In the browser, paste a link instead.
 
-**3. Use real fact-checks:** copy `server/.env.example` to `server/.env`, add your `ANTHROPIC_API_KEY` and a `HEALTH_DATA_KEY`, install [yt-dlp](https://github.com/yt-dlp/yt-dlp#installation), then run `npm run dev`.
+**3. Use real fact-checks:** copy `server/.env.example` to `server/.env`, add your `ANTHROPIC_API_KEY`, `DEEPGRAM_API_KEY` and a `HEALTH_DATA_KEY`, install [yt-dlp](https://github.com/yt-dlp/yt-dlp#installation), then run `npm run dev`.
 
 ## Run it on a phone
 
@@ -83,17 +89,17 @@ Set `EXPO_PUBLIC_API_URL` to your server's address for real builds.
 
 ## Going live checklist
 
-- [ ] **Name and branding.** "FactFit" and the `com.factfit.app` bundle ID are placeholders (`mobile/app.json`).
+- [ ] **Name and branding.** "Sift" and the `com.sifthealth.app` bundle ID are placeholders (`mobile/app.json`).
 - [ ] **Apple Developer** ($99/yr) and **Google Play** ($25 one-off) accounts.
-- [ ] **Subscriptions.** Apple and Google require their own in-app billing for app subscriptions. Create the three products (`factfit_basic_monthly`, `factfit_plus_monthly`, `factfit_pro_monthly`) in both stores, connect them in [RevenueCat](https://www.revenuecat.com), set the RevenueCat keys in the app (`EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `_ANDROID_KEY`), point RevenueCat's webhook at `/billing/revenuecat/webhook`, and set `BILLING_MODE=revenuecat`.
+- [ ] **Subscriptions.** Apple and Google require their own in-app billing for app subscriptions. Create the three products (`sift_basic_monthly`, `sift_plus_monthly`, `sift_pro_monthly`) in both stores, connect them in [RevenueCat](https://www.revenuecat.com), set the RevenueCat keys in the app (`EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `_ANDROID_KEY`), point RevenueCat's webhook at `/billing/revenuecat/webhook`, and set `BILLING_MODE=revenuecat`.
 - [ ] **Hosting.** Deploy `server/` (a Dockerfile is included) with a persistent disk for the database, or move to managed Postgres as you grow.
 - [ ] **Legal.** A privacy policy and terms of service, reviewed by a lawyer, and a data processing agreement with Anthropic (health data is "special category" data under GDPR). Check whether personal health advice needs extra approval in your launch countries.
-- [ ] **Videos without captions.** Many TikTok and Instagram videos have no captions. Adding speech-to-text would let FactFit check what's *said* in those videos. For now the check uses the caption, title and an optional user note.
+- [ ] **Speech-to-text.** Create a [Deepgram](https://deepgram.com) account and set `DEEPGRAM_API_KEY` so Sift can hear videos without captions. It costs roughly half a cent per minute of video. Videos over 15 minutes aren't transcribed (change with `MAX_TRANSCRIBE_SECONDS`).
 
 ## Development
 
 ```bash
-cd server && npm test          # 32 tests (AI is mocked, no API costs)
+cd server && npm test          # AI and speech-to-text are mocked, so no API costs
 cd server && npm run typecheck
 cd mobile && npx tsc --noEmit
 ```

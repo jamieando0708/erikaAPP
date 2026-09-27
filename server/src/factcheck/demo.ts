@@ -10,6 +10,7 @@ export class DemoFactChecker implements FactChecker {
   async check(input: FactCheckInput): Promise<FactCheckReport> {
     await new Promise((r) => setTimeout(r, 3000));
     return {
+      headline: "[DEMO] Apple cider vinegar for belly fat? Here's what the evidence says.",
       topic: "nutrition",
       overall_score: 42,
       verdict: "misleading",

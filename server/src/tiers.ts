@@ -57,9 +57,9 @@ export const TIERS: Record<TierId, Tier> = {
 
 /** Store product IDs (App Store / Google Play, via RevenueCat) -> tier. */
 export const PRODUCT_TO_TIER: Record<string, TierId> = {
-  factfit_basic_monthly: "basic",
-  factfit_plus_monthly: "plus",
-  factfit_pro_monthly: "pro",
+  sift_basic_monthly: "basic",
+  sift_plus_monthly: "plus",
+  sift_pro_monthly: "pro",
 };
 
 export function effectiveTier(tier: string, expiresAt: number | null, now = Date.now()): Tier {

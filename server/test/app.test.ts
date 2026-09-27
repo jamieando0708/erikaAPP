@@ -18,9 +18,12 @@ const config: Config = {
   claudeModel: "test",
   corsOrigins: [],
   demoMode: false,
+  deepgramApiKey: null,
+  maxTranscribeSeconds: 900,
 };
 
 const fakeReport: FactCheckReport = {
+  headline: "Squats fix everything?",
   topic: "fitness",
   overall_score: 80,
   verdict: "mostly_accurate",
@@ -120,6 +123,18 @@ describe("API", () => {
     expect((await request(ctx.app).get("/checks").set(auth)).body).toHaveLength(1);
   });
 
+  it("checks a pasted claim without a link", async () => {
+    const { token } = await signup(ctx.app);
+    const auth = { Authorization: `Bearer ${token}` };
+    const claim = "Magnesium supplements fix insomnia for everyone";
+    const started = await request(ctx.app).post("/checks").set(auth).send({ shared: claim }).expect(202);
+    await ctx.waitForIdle();
+    expect(ctx.inputs[0]).toMatchObject({ url: null, video: null, platform: "text", userNote: claim });
+    const check = await request(ctx.app).get(`/checks/${started.body.id}`).set(auth);
+    expect(check.body.status).toBe("done");
+    expect(check.body.platform).toBe("text");
+  });
+
   it("only sends the health profile on plans with personal advice", async () => {
     const { token } = await signup(ctx.app);
     const auth = { Authorization: `Bearer ${token}` };
@@ -151,7 +166,7 @@ describe("API", () => {
   it("rejects non-links and internal addresses", async () => {
     const { token } = await signup(ctx.app);
     const auth = { Authorization: `Bearer ${token}` };
-    expect((await request(ctx.app).post("/checks").set(auth).send({ shared: "hello" })).body.code).toBe("bad_link");
+    expect((await request(ctx.app).post("/checks").set(auth).send({ shared: "hello" })).body.code).toBe("bad_input");
     expect((await request(ctx.app).post("/checks").set(auth).send({ shared: "http://169.254.169.254/latest" })).body.code).toBe("bad_link");
   });
 
@@ -208,7 +223,7 @@ describe("API", () => {
   it("applies RevenueCat subscription events", async () => {
     const { token, userId } = await signup(ctx.app);
     const auth = { Authorization: `Bearer ${token}` };
-    const event = (type: string, product_id = "factfit_plus_monthly") => ({
+    const event = (type: string, product_id = "sift_plus_monthly") => ({
       event: { type, app_user_id: userId, product_id, expiration_at_ms: Date.now() + 86_400_000 },
     });
 

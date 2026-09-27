@@ -45,6 +45,8 @@ export interface SavedProfile extends HealthProfile {
 }
 
 export interface Report {
+  /** Missing on results created before headlines were added. */
+  headline?: string;
   topic: string;
   overall_score: number;
   verdict: string;

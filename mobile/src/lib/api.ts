@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import type { Check, CheckSummary, HealthProfile, Me, SavedProfile, Tier, TierId } from "./types";
 
 /**
- * Where the FactFit server lives. Set EXPO_PUBLIC_API_URL for real builds.
+ * Where the Sift server lives. Set EXPO_PUBLIC_API_URL for real builds.
  * In development we point at the computer running `expo start`, so a phone
  * on the same Wi-Fi can reach a local server.
  */

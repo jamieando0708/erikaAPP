@@ -6,6 +6,7 @@ export const TOPICS = ["fitness", "nutrition", "medical", "mental_health", "supp
 
 /** What the model submits through the submit_report tool. */
 export const ModelReportSchema = z.object({
+  headline: z.string().min(1),
   topic: z.enum(TOPICS),
   overall_score: z.number().int().min(0).max(100),
   verdict: z.enum(VERDICTS),
@@ -49,6 +50,7 @@ export const SUBMIT_REPORT_INPUT_SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: [
+    "headline",
     "topic",
     "overall_score",
     "verdict",
@@ -61,6 +63,11 @@ export const SUBMIT_REPORT_INPUT_SCHEMA = {
     "urgent_safety_warning",
   ],
   properties: {
+    headline: {
+      type: "string",
+      description:
+        "A short title for the result, phrased around the main claim, e.g. \"Magnesium supplements for better sleep? Here's what the evidence says.\"",
+    },
     topic: { type: "string", enum: [...TOPICS] },
     overall_score: {
       type: "integer",

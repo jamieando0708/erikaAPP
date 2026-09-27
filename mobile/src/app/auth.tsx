@@ -1,8 +1,11 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useShareIntentContext } from "expo-share-intent";
 import { useState } from "react";
+import { View } from "react-native";
+import { PulseMark } from "../components/Logo";
 import { Body, Button, ErrorText, Field, Screen, Title } from "../components/ui";
 import { useAuth } from "../lib/auth";
+import { space } from "../lib/theme";
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -32,8 +35,11 @@ export default function AuthScreen() {
 
   return (
     <Screen>
-      <Title>{mode === "signup" ? "Create your account" : "Welcome back"}</Title>
-      {mode === "signup" ? <Body muted>You get 3 free checks every month.</Body> : null}
+      <View style={{ gap: space.md, paddingBottom: space.sm }}>
+        <PulseMark size={36} />
+        <Title>{mode === "signup" ? "Create your account" : "Welcome back"}</Title>
+        {mode === "signup" ? <Body muted>Free to start: 3 checks every month.</Body> : null}
+      </View>
       <Field
         label="Email"
         value={email}
@@ -54,15 +60,10 @@ export default function AuthScreen() {
         onSubmitEditing={submit}
       />
       <ErrorText message={error} />
-      <Button
-        title={mode === "signup" ? "Create account" : "Log in"}
-        onPress={submit}
-        loading={busy}
-        disabled={!email || !password}
-      />
+      <Button title={mode === "signup" ? "Create account" : "Log in"} onPress={submit} loading={busy} disabled={!email || !password} />
       <Button
         title={mode === "signup" ? "I already have an account" : "Create a new account"}
-        variant="secondary"
+        variant="ghost"
         onPress={() => router.setParams({ mode: mode === "signup" ? "login" : "signup" })}
       />
     </Screen>
